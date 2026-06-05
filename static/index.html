@@ -131,6 +131,7 @@ let synthControl = null;
 let audioContext = null;
 let isPlaying = false;
 let isPaused = false;
+let endTimer = null;
 
 // ---- File tree ----
 
@@ -302,9 +303,9 @@ async function startPlay() {
     });
     await synth.prime();
     synthControl = synth;
-    synth.start().then(() => {
-      if (synthControl === synth) stopPlay();
-    });
+    synth.start();
+    const durationMs = visualObj[0].getTotalTime() * 1000;
+    endTimer = setTimeout(() => { if (synthControl === synth) stopPlay(); }, durationMs);
     isPlaying = true;
     document.getElementById('play-btn').textContent = '⏸ Pause';
     document.getElementById('play-btn').classList.add('playing');
@@ -315,6 +316,8 @@ async function startPlay() {
 }
 
 function stopPlay() {
+  clearTimeout(endTimer);
+  endTimer = null;
   if (synthControl) {
     try { synthControl.stop(); } catch(e) {}
     synthControl = null;
