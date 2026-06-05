@@ -273,15 +273,14 @@ function renderABC() {
 
 async function togglePlay() {
   if (isPlaying) {
-    synthController.pause();
+    await synthController.play(); // toggle: playing → paused
     isPlaying = false;
     isPaused = true;
     document.getElementById('play-btn').textContent = '▶ Play';
     document.getElementById('play-btn').classList.remove('playing');
     setStatus('Paused');
   } else if (isPaused) {
-    if (audioContext.state === 'suspended') await audioContext.resume();
-    synthController.play();
+    await synthController.play(); // toggle: paused → playing
     isPlaying = true;
     isPaused = false;
     document.getElementById('play-btn').textContent = '⏸ Pause';
@@ -314,7 +313,7 @@ async function startPlay() {
 
   try {
     await synthController.setTune(visualObj[0], false, { audioContext });
-    synthController.play();
+    await synthController.play(); // isStarted: false→true (fresh start)
     isPlaying = true;
     document.getElementById('play-btn').textContent = '⏸ Pause';
     document.getElementById('play-btn').classList.add('playing');
