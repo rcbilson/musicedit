@@ -279,12 +279,16 @@ async function startPlay() {
   const visualObj = ABCJS.renderAbc('notation', content, { responsive: 'resize' });
   if (!visualObj || !visualObj[0]) { setStatus('Nothing to play'); return; }
 
-  synthControl = new ABCJS.synth.SynthController();
-  synthControl.load('#notation', null, { displayPlay: false, displayProgress: false });
-
   try {
-    await synthControl.setTune(visualObj[0], false, { audioContext });
-    synthControl.play();
+    const synth = new ABCJS.synth.CreateSynth();
+    await synth.init({
+      audioContext,
+      visualObj: visualObj[0],
+      millisecondsPerMeasure: visualObj[0].millisecondsPerMeasure(),
+    });
+    await synth.prime();
+    synth.start();
+    synthControl = synth;
     isPlaying = true;
     document.getElementById('play-btn').textContent = '⏸ Pause';
     document.getElementById('play-btn').classList.add('playing');
@@ -302,6 +306,7 @@ function stopPlay() {
   isPlaying = false;
   document.getElementById('play-btn').textContent = '▶ Play';
   document.getElementById('play-btn').classList.remove('playing');
+  renderABC();
 }
 
 // ---- Editor input ----
