@@ -130,6 +130,7 @@ let renderTimer = null;
 let synthControl = null;
 let audioContext = null;
 let isPlaying = false;
+let isPaused = false;
 
 // ---- File tree ----
 
@@ -261,7 +262,20 @@ function renderABC() {
 
 async function togglePlay() {
   if (isPlaying) {
-    stopPlay();
+    synthControl.pause();
+    isPlaying = false;
+    isPaused = true;
+    document.getElementById('play-btn').textContent = '▶ Play';
+    document.getElementById('play-btn').classList.remove('playing');
+    setStatus('Paused');
+  } else if (isPaused && synthControl) {
+    if (audioContext.state === 'suspended') await audioContext.resume();
+    synthControl.resume();
+    isPlaying = true;
+    isPaused = false;
+    document.getElementById('play-btn').textContent = '⏸ Pause';
+    document.getElementById('play-btn').classList.add('playing');
+    setStatus('Playing…');
   } else {
     await startPlay();
   }
@@ -304,6 +318,7 @@ function stopPlay() {
     synthControl = null;
   }
   isPlaying = false;
+  isPaused = false;
   document.getElementById('play-btn').textContent = '▶ Play';
   document.getElementById('play-btn').classList.remove('playing');
   renderABC();
