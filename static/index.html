@@ -302,15 +302,18 @@ async function startPlay() {
       millisecondsPerMeasure: visualObj[0].millisecondsPerMeasure(),
     });
     await synth.prime();
-    synthControl = synth;
     synth.start();
-    const durationMs = visualObj[0].getTotalTime() * 1000;
-    endTimer = setTimeout(() => { if (synthControl === synth) stopPlay(); }, durationMs);
+    synthControl = synth;
     isPlaying = true;
     document.getElementById('play-btn').textContent = '⏸ Pause';
     document.getElementById('play-btn').classList.add('playing');
     setStatus('Playing…');
+    const durationMs = visualObj[0].getTotalTime() * 1000;
+    if (durationMs > 0) {
+      endTimer = setTimeout(() => { if (synthControl === synth) stopPlay(); }, durationMs);
+    }
   } catch(e) {
+    stopPlay();
     setStatus('Playback error: ' + e.message);
   }
 }
