@@ -88,6 +88,7 @@
 </style>
 </head>
 <body>
+<div id="synth-container" style="display:none"></div>
 
 <div id="toolbar">
   <h1>ABC Music Editor</h1>
@@ -127,11 +128,20 @@
 let currentFile = null;
 let isDirty = false;
 let renderTimer = null;
-let synthControl = null;
+let synthController = null;
 let audioContext = null;
 let isPlaying = false;
 let isPaused = false;
-let endTimer = null;
+
+const playbackCursorControl = {
+  onFinished: () => {
+    isPlaying = false;
+    isPaused = false;
+    document.getElementById('play-btn').textContent = '▶ Play';
+    document.getElementById('play-btn').classList.remove('playing');
+    setStatus('Ready');
+  }
+};
 
 // ---- File tree ----
 
@@ -263,15 +273,15 @@ function renderABC() {
 
 async function togglePlay() {
   if (isPlaying) {
-    synthControl.pause();
+    synthController.pause();
     isPlaying = false;
     isPaused = true;
     document.getElementById('play-btn').textContent = '▶ Play';
     document.getElementById('play-btn').classList.remove('playing');
     setStatus('Paused');
-  } else if (isPaused && synthControl) {
+  } else if (isPaused) {
     if (audioContext.state === 'suspended') await audioContext.resume();
-    synthControl.resume();
+    synthController.play();
     isPlaying = true;
     isPaused = false;
     document.getElementById('play-btn').textContent = '⏸ Pause';
@@ -294,24 +304,21 @@ async function startPlay() {
   const visualObj = ABCJS.renderAbc('notation', content, { responsive: 'resize' });
   if (!visualObj || !visualObj[0]) { setStatus('Nothing to play'); return; }
 
-  try {
-    const synth = new ABCJS.synth.CreateSynth();
-    await synth.init({
-      audioContext,
-      visualObj: visualObj[0],
-      millisecondsPerMeasure: visualObj[0].millisecondsPerMeasure(),
+  if (!synthController) {
+    synthController = new ABCJS.synth.SynthController();
+    synthController.load('#synth-container', playbackCursorControl, {
+      displayLoop: false, displayRestart: false, displayPlay: false,
+      displayProgress: false, displayWarp: false,
     });
-    await synth.prime();
-    synth.start();
-    synthControl = synth;
+  }
+
+  try {
+    await synthController.setTune(visualObj[0], false, { audioContext });
+    synthController.play();
     isPlaying = true;
     document.getElementById('play-btn').textContent = '⏸ Pause';
     document.getElementById('play-btn').classList.add('playing');
     setStatus('Playing…');
-    const durationMs = visualObj[0].getTotalTime() * 1000;
-    if (durationMs > 0) {
-      endTimer = setTimeout(() => { if (synthControl === synth) stopPlay(); }, durationMs);
-    }
   } catch(e) {
     stopPlay();
     setStatus('Playback error: ' + e.message);
@@ -319,11 +326,8 @@ async function startPlay() {
 }
 
 function stopPlay() {
-  clearTimeout(endTimer);
-  endTimer = null;
-  if (synthControl) {
-    try { synthControl.stop(); } catch(e) {}
-    synthControl = null;
+  if (synthController) {
+    try { synthController.stop(); } catch(e) {}
   }
   isPlaying = false;
   isPaused = false;
