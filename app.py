@@ -39,7 +39,9 @@ def file_tree(root: Path, base: Path):
 def safe_path(rel: str) -> Path:
     root = get_root()
     target = (root / rel).resolve()
-    if not str(target).startswith(str(root)):
+    try:
+        target.relative_to(root)
+    except ValueError:
         raise ValueError("Path escape attempt")
     return target
 
