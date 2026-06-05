@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABC Music Editor</title>
+<script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.4/dist/abcjs-min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; background: #1e1e2e; color: #cdd6f4; }
+
+  #toolbar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; background: #181825; border-bottom: 1px solid #313244;
+    flex-shrink: 0;
+  }
+  #toolbar h1 { font-size: 1rem; font-weight: 600; color: #cba6f7; margin-right: auto; }
+  button {
+    padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer;
+    font-size: 0.85rem; background: #45475a; color: #cdd6f4;
+  }
+  button:hover { background: #585b70; }
+  button.primary { background: #89b4fa; color: #1e1e2e; }
+  button.primary:hover { background: #74c7ec; }
+  button.danger { background: #f38ba8; color: #1e1e2e; }
+  #new-filename { padding: 4px 8px; border-radius: 4px; border: 1px solid #45475a; background: #313244; color: #cdd6f4; font-size: 0.85rem; width: 180px; }
+
+  #main { display: flex; flex: 1; overflow: hidden; }
+
+  /* Sidebar */
+  #sidebar {
+    width: 240px; min-width: 140px; max-width: 400px;
+    background: #181825; border-right: 1px solid #313244;
+    display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
+  }
+  #sidebar-header { padding: 8px 12px; font-size: 0.75rem; font-weight: 600; color: #a6adc8; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #313244; }
+  #file-tree { flex: 1; overflow-y: auto; padding: 4px 0; }
+  .tree-item { display: flex; align-items: center; gap: 6px; padding: 3px 12px; cursor: pointer; font-size: 0.85rem; white-space: nowrap; }
+  .tree-item:hover { background: #313244; }
+  .tree-item.selected { background: #45475a; color: #89b4fa; }
+  .tree-item .icon { flex-shrink: 0; opacity: 0.7; }
+  .tree-dir { font-weight: 600; }
+  .tree-children { padding-left: 16px; }
+  .tree-children.collapsed { display: none; }
+
+  /* Editor panel */
+  #editor-panel {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  }
+  #editor-header {
+    padding: 6px 12px; background: #181825; border-bottom: 1px solid #313244;
+    font-size: 0.85rem; color: #a6adc8; display: flex; align-items: center; gap: 8px;
+  }
+  #current-file { font-weight: 600; color: #cdd6f4; }
+  .dirty-indicator { color: #f9e2af; }
+
+  #editor-area { display: flex; flex: 1; overflow: hidden; }
+
+  #abc-editor {
+    width: 50%; resize: none; padding: 12px; font-family: 'Courier New', monospace;
+    font-size: 0.85rem; background: #1e1e2e; color: #cdd6f4; border: none;
+    border-right: 1px solid #313244; outline: none; line-height: 1.5;
+  }
+
+  #preview-panel {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #fff;
+  }
+  #preview-controls {
+    padding: 6px 10px; background: #f5f5f5; border-bottom: 1px solid #ddd;
+    display: flex; gap: 6px; align-items: center; flex-shrink: 0;
+  }
+  #preview-controls button { background: #6c757d; color: #fff; }
+  #preview-controls button:hover { background: #5a6268; }
+  #preview-controls button.playing { background: #28a745; }
+  #notation { flex: 1; overflow-y: auto; padding: 16px; }
+  #notation svg { max-width: 100%; }
+
+  #status-bar {
+    padding: 3px 12px; font-size: 0.75rem; color: #a6adc8;
+    background: #181825; border-top: 1px solid #313244; flex-shrink: 0;
+  }
+
+  .no-file {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    color: #585b70; font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <h1>ABC Music Editor</h1>
+  <input id="new-filename" type="text" placeholder="new-piece.abc" />
+  <button class="primary" onclick="createFile()">New File</button>
+  <button class="primary" onclick="saveFile()" id="save-btn" disabled>Save</button>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <div id="sidebar-header">Files</div>
+    <div id="file-tree">Loading…</div>
+  </div>
+
+  <div id="editor-panel">
+    <div id="editor-header">
+      <span id="current-file">No file open</span>
+      <span id="dirty-indicator" class="dirty-indicator" style="display:none">●</span>
+    </div>
+    <div id="editor-area">
+      <div class="no-file" id="no-file-msg">Open a file from the sidebar</div>
+      <textarea id="abc-editor" style="display:none" spellcheck="false"></textarea>
+      <div id="preview-panel" style="display:none">
+        <div id="preview-controls">
+          <button id="play-btn" onclick="togglePlay()">▶ Play</button>
+          <button onclick="stopPlay()">■ Stop</button>
+        </div>
+        <div id="notation"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="status-bar" id="status-bar">Ready</div>
+
+<script>
+let currentFile = null;
+let isDirty = false;
+let renderTimer = null;
+let synthControl = null;
+let audioContext = null;
+let isPlaying = false;
+
+// ---- File tree ----
+
+async function loadTree() {
+  const res = await fetch('/api/files');
+  const tree = await res.json();
+  const el = document.getElementById('file-tree');
+  el.innerHTML = '';
+  renderTree(tree, el);
+}
+
+function renderTree(nodes, container) {
+  for (const node of nodes) {
+    if (node.type === 'dir') {
+      const wrapper = document.createElement('div');
+      const header = document.createElement('div');
+      header.className = 'tree-item tree-dir';
+      header.innerHTML = `<span class="icon">📁</span><span>${escHtml(node.name)}</span>`;
+      const children = document.createElement('div');
+      children.className = 'tree-children';
+      renderTree(node.children, children);
+      header.onclick = () => children.classList.toggle('collapsed');
+      wrapper.appendChild(header);
+      wrapper.appendChild(children);
+      container.appendChild(wrapper);
+    } else {
+      const item = document.createElement('div');
+      item.className = 'tree-item';
+      item.dataset.path = node.path;
+      item.innerHTML = `<span class="icon">♪</span><span>${escHtml(node.name)}</span>`;
+      item.onclick = () => openFile(node.path, item);
+      container.appendChild(item);
+    }
+  }
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ---- File operations ----
+
+async function openFile(path, itemEl) {
+  if (isDirty && !confirm('Unsaved changes. Discard?')) return;
+
+  document.querySelectorAll('.tree-item.selected').forEach(e => e.classList.remove('selected'));
+  if (itemEl) itemEl.classList.add('selected');
+
+  const res = await fetch(`/api/file?path=${encodeURIComponent(path)}`);
+  const data = await res.json();
+  if (data.error) { setStatus('Error: ' + data.error); return; }
+
+  currentFile = path;
+  isDirty = false;
+  document.getElementById('current-file').textContent = path;
+  document.getElementById('dirty-indicator').style.display = 'none';
+  document.getElementById('save-btn').disabled = false;
+
+  const editor = document.getElementById('abc-editor');
+  editor.value = data.content;
+  document.getElementById('no-file-msg').style.display = 'none';
+  editor.style.display = 'block';
+  document.getElementById('preview-panel').style.display = 'flex';
+
+  stopPlay();
+  renderABC();
+  setStatus(`Opened: ${path}`);
+}
+
+async function saveFile() {
+  if (!currentFile) return;
+  const content = document.getElementById('abc-editor').value;
+  const res = await fetch('/api/file', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({path: currentFile, content}),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    isDirty = false;
+    document.getElementById('dirty-indicator').style.display = 'none';
+    setStatus(`Saved: ${currentFile}`);
+  } else {
+    setStatus('Save failed: ' + (data.error || 'unknown'));
+  }
+}
+
+async function createFile() {
+  const input = document.getElementById('new-filename');
+  let name = input.value.trim();
+  if (!name) { setStatus('Enter a filename'); return; }
+  if (!name.includes('/') && !name.match(/\.[^.]+$/)) name += '.abc';
+
+  const template = `X: 1\nT: ${name.replace(/\.abc$/i,'')}\nM: 4/4\nL: 1/8\nK: C\n|: z4 :|`;
+  const res = await fetch('/api/file/create', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({path: name, content: template}),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    input.value = '';
+    await loadTree();
+    // Find and open the new file
+    const item = document.querySelector(`[data-path="${CSS.escape(name)}"]`);
+    openFile(name, item);
+    setStatus(`Created: ${name}`);
+  } else {
+    setStatus('Create failed: ' + (data.error || 'unknown'));
+  }
+}
+
+// ---- ABC rendering ----
+
+function renderABC() {
+  const content = document.getElementById('abc-editor').value;
+  const container = document.getElementById('notation');
+  try {
+    ABCJS.renderAbc('notation', content, {
+      responsive: 'resize',
+      add_classes: true,
+    });
+  } catch(e) {
+    container.innerHTML = `<div style="color:red;padding:8px">Parse error: ${escHtml(e.message)}</div>`;
+  }
+}
+
+// ---- Audio playback ----
+
+async function togglePlay() {
+  if (isPlaying) {
+    stopPlay();
+  } else {
+    await startPlay();
+  }
+}
+
+async function startPlay() {
+  stopPlay();
+  const content = document.getElementById('abc-editor').value;
+
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioContext.state === 'suspended') await audioContext.resume();
+
+  const visualObj = ABCJS.renderAbc('notation', content, { responsive: 'resize' });
+  if (!visualObj || !visualObj[0]) { setStatus('Nothing to play'); return; }
+
+  synthControl = new ABCJS.synth.SynthController();
+  synthControl.load('#notation', null, { displayPlay: false, displayProgress: false });
+
+  try {
+    await synthControl.setTune(visualObj[0], false, { audioContext });
+    synthControl.play();
+    isPlaying = true;
+    document.getElementById('play-btn').textContent = '⏸ Pause';
+    document.getElementById('play-btn').classList.add('playing');
+    setStatus('Playing…');
+  } catch(e) {
+    setStatus('Playback error: ' + e.message);
+  }
+}
+
+function stopPlay() {
+  if (synthControl) {
+    try { synthControl.stop(); } catch(e) {}
+    synthControl = null;
+  }
+  isPlaying = false;
+  document.getElementById('play-btn').textContent = '▶ Play';
+  document.getElementById('play-btn').classList.remove('playing');
+}
+
+// ---- Editor input ----
+
+document.getElementById('abc-editor').addEventListener('input', () => {
+  if (!isDirty) {
+    isDirty = true;
+    document.getElementById('dirty-indicator').style.display = 'inline';
+  }
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(renderABC, 400);
+});
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    saveFile();
+  }
+});
+
+// ---- Helpers ----
+
+function setStatus(msg) {
+  document.getElementById('status-bar').textContent = msg;
+}
+
+// ---- Init ----
+loadTree();
+</script>
+</body>
+</html>
