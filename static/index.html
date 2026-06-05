@@ -301,8 +301,10 @@ async function startPlay() {
       millisecondsPerMeasure: visualObj[0].millisecondsPerMeasure(),
     });
     await synth.prime();
-    synth.start();
     synthControl = synth;
+    synth.start().then(() => {
+      if (synthControl === synth) stopPlay();
+    });
     isPlaying = true;
     document.getElementById('play-btn').textContent = '⏸ Pause';
     document.getElementById('play-btn').classList.add('playing');
