@@ -302,7 +302,6 @@ function renderABC() {
 function updateTempo(val) {
   tempoPercent = parseInt(val);
   document.getElementById('tempo-display').textContent = tempoPercent + '%';
-  if (synthController) synthController.setWarp(tempoPercent);
 }
 
 function toggleRepeat() {
