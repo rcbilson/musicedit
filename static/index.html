@@ -225,7 +225,7 @@ async function openFile(path, itemEl) {
   editor.style.display = 'block';
   document.getElementById('preview-panel').style.display = 'flex';
 
-  stopPlay();
+  await stopPlay();
   renderABC();
   setStatus(`Opened: ${path}`);
 }
@@ -311,7 +311,7 @@ async function togglePlay() {
 }
 
 async function startPlay() {
-  stopPlay();
+  await stopPlay();
   const content = document.getElementById('abc-editor').value;
 
   if (!audioContext) {
@@ -343,10 +343,11 @@ async function startPlay() {
   }
 }
 
-function stopPlay() {
+async function stopPlay() {
   clearHighlight();
   if (synthController) {
-    try { synthController.stop(); } catch(e) {}
+    try { if (isPlaying) await synthController.play(); } catch(e) {}
+    synthController = null;
   }
   isPlaying = false;
   isPaused = false;
