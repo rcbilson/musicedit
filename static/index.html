@@ -117,6 +117,11 @@
           <button id="play-btn" onclick="togglePlay()">▶ Play</button>
           <button onclick="stopPlay()">■ Stop</button>
           <button id="repeat-btn" onclick="toggleRepeat()">⟳ Repeat</button>
+          <label style="display:flex;align-items:center;gap:4px;font-size:0.8rem;color:#555;margin-left:8px;">
+            Tempo
+            <input id="tempo-slider" type="range" min="25" max="200" step="5" value="100" oninput="updateTempo(this.value)" style="width:90px;">
+            <span id="tempo-display" style="min-width:3.5em;">100%</span>
+          </label>
         </div>
         <div id="notation"></div>
       </div>
@@ -135,6 +140,7 @@ let audioContext = null;
 let isPlaying = false;
 let isPaused = false;
 let repeatMode = false;
+let tempoPercent = 100;
 let highlighted = [];
 
 function clearHighlight() {
@@ -293,6 +299,11 @@ function renderABC() {
 
 // ---- Audio playback ----
 
+function updateTempo(val) {
+  tempoPercent = parseInt(val);
+  document.getElementById('tempo-display').textContent = tempoPercent + '%';
+}
+
 function toggleRepeat() {
   repeatMode = !repeatMode;
   const btn = document.getElementById('repeat-btn');
@@ -340,7 +351,8 @@ async function startPlay() {
   }
 
   try {
-    await synthController.setTune(visualObj[0], false, { audioContext });
+    const msPerMeasure = visualObj[0].millisecondsPerMeasure() / (tempoPercent / 100);
+    await synthController.setTune(visualObj[0], false, { audioContext, millisecondsPerMeasure: msPerMeasure });
     await synthController.play(); // isStarted: false→true (fresh start)
     isPlaying = true;
     document.getElementById('play-btn').textContent = '⏸ Pause';
