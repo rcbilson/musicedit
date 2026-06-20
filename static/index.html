@@ -292,10 +292,12 @@ function renderABC() {
   const container = document.getElementById('notation');
   try {
     ABCJS.renderAbc('notation', content, {
+      responsive: 'resize',
       add_classes: true,
     });
-    container.style.overflow = '';
-    container.style.height = '';
+    container.style.cssText = '';
+    const svg = container.querySelector('svg');
+    if (svg) svg.style.cssText = '';
   } catch(e) {
     container.innerHTML = `<div style="color:red;padding:8px">Parse error: ${escHtml(e.message)}</div>`;
   }
@@ -343,10 +345,11 @@ async function startPlay() {
   }
   if (audioContext.state === 'suspended') await audioContext.resume();
 
-  const visualObj = ABCJS.renderAbc('notation', content, {});
+  const visualObj = ABCJS.renderAbc('notation', content, { responsive: 'resize' });
   const notationEl = document.getElementById('notation');
-  notationEl.style.overflow = '';
-  notationEl.style.height = '';
+  notationEl.style.cssText = '';
+  const svgEl = notationEl.querySelector('svg');
+  if (svgEl) svgEl.style.cssText = '';
   if (!visualObj || !visualObj[0]) { setStatus('Nothing to play'); return; }
 
   if (!synthController) {
