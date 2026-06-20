@@ -302,6 +302,7 @@ function renderABC() {
 function updateTempo(val) {
   tempoPercent = parseInt(val);
   document.getElementById('tempo-display').textContent = tempoPercent + '%';
+  if (synthController) synthController.setWarp(tempoPercent);
 }
 
 function toggleRepeat() {
@@ -351,8 +352,8 @@ async function startPlay() {
   }
 
   try {
-    const msPerMeasure = visualObj[0].millisecondsPerMeasure() / (tempoPercent / 100);
-    await synthController.setTune(visualObj[0], false, { audioContext, millisecondsPerMeasure: msPerMeasure });
+    await synthController.setTune(visualObj[0], false, { audioContext });
+    await synthController.setWarp(tempoPercent);
     await synthController.play(); // isStarted: false→true (fresh start)
     isPlaying = true;
     document.getElementById('play-btn').textContent = '⏸ Pause';
