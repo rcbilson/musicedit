@@ -73,7 +73,7 @@
   #preview-controls button { background: #6c757d; color: #fff; height: 28px; padding: 0 12px; }
   #preview-controls button:hover { background: #5a6268; }
   #preview-controls button.playing { background: #28a745; }
-  #notation { flex: 1; overflow-y: auto; padding: 16px; color: black; }
+  #notation { flex: 1; overflow-y: auto; padding: 16px; color: black; min-height: 0; }
   #notation svg { max-width: 100%; }
   .abcjs-highlight { fill: #1d6ae5 !important; }
 
@@ -158,6 +158,9 @@ const playbackCursorControl = {
           highlighted.push(el);
         });
       });
+      if (highlighted[0]) {
+        highlighted[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
     }
   },
   onFinished: () => {
