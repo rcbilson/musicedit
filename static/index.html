@@ -116,6 +116,7 @@
         <div id="preview-controls">
           <button id="play-btn" onclick="togglePlay()">▶ Play</button>
           <button onclick="stopPlay()">■ Stop</button>
+          <button id="repeat-btn" onclick="toggleRepeat()">⟳ Repeat</button>
         </div>
         <div id="notation"></div>
       </div>
@@ -133,6 +134,7 @@ let synthController = null;
 let audioContext = null;
 let isPlaying = false;
 let isPaused = false;
+let repeatMode = false;
 let highlighted = [];
 
 function clearHighlight() {
@@ -158,6 +160,7 @@ const playbackCursorControl = {
     isPaused = false;
     document.getElementById('play-btn').textContent = '▶ Play';
     document.getElementById('play-btn').classList.remove('playing');
+    if (repeatMode) { startPlay(); return; }
     setStatus('Ready');
   }
 };
@@ -289,6 +292,12 @@ function renderABC() {
 }
 
 // ---- Audio playback ----
+
+function toggleRepeat() {
+  repeatMode = !repeatMode;
+  const btn = document.getElementById('repeat-btn');
+  btn.classList.toggle('playing', repeatMode);
+}
 
 async function togglePlay() {
   if (isPlaying) {
