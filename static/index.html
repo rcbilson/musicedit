@@ -347,7 +347,7 @@ async function startPlay() {
     synthController = new ABCJS.synth.SynthController();
     synthController.load('#synth-container', playbackCursorControl, {
       displayLoop: false, displayRestart: false, displayPlay: false,
-      displayProgress: false, displayWarp: false,
+      displayProgress: false, displayWarp: true,
     });
   }
 
