@@ -74,7 +74,8 @@
   #preview-controls button:hover { background: #5a6268; }
   #preview-controls button.playing { background: #28a745; }
   #notation { flex: 1; overflow-y: auto; padding: 16px; color: black; min-height: 0; }
-  #notation svg { max-width: 100%; pointer-events: none; }
+  #notation .abcjs-container { position: static !important; display: block !important; padding-bottom: 0 !important; overflow: visible !important; }
+  #notation .abcjs-container svg { position: static !important; width: 100% !important; height: auto !important; pointer-events: none; }
   .abcjs-highlight { fill: #1d6ae5 !important; }
 
   #status-bar {
