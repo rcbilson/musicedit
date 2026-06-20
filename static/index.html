@@ -86,6 +86,23 @@
     flex: 1; display: flex; align-items: center; justify-content: center;
     color: #585b70; font-size: 0.9rem;
   }
+
+  #sidebar-header { display: flex; align-items: center; justify-content: space-between; }
+  .tree-actions { display: none; gap: 2px; flex-shrink: 0; margin-left: auto; }
+  .tree-item:hover .tree-actions { display: flex; }
+  .tree-action-btn {
+    padding: 1px 5px; border-radius: 3px; border: none; cursor: pointer;
+    font-size: 0.7rem; background: #313244; color: #a6adc8; line-height: 1.5;
+  }
+  .tree-action-btn:hover { background: #45475a; color: #cdd6f4; }
+  .sidebar-root-actions { display: flex; gap: 2px; }
+  .tree-inline-row { padding: 2px 8px 4px 12px; }
+  .tree-inline-row input {
+    width: 100%; padding: 2px 6px; border-radius: 3px;
+    border: 1px solid #45475a; background: #313244; color: #cdd6f4;
+    font-size: 0.8rem; outline: none;
+  }
+  .tree-inline-row input:focus { border-color: #89b4fa; }
 </style>
 </head>
 <body>
@@ -100,7 +117,13 @@
 
 <div id="main">
   <div id="sidebar">
-    <div id="sidebar-header">Files</div>
+    <div id="sidebar-header">
+      Files
+      <span class="sidebar-root-actions">
+        <button class="tree-action-btn" title="New file at root" onclick="showCreateInput(document.getElementById('file-tree'),'','file')">+f</button>
+        <button class="tree-action-btn" title="New folder at root" onclick="showCreateInput(document.getElementById('file-tree'),'','dir')">+d</button>
+      </span>
+    </div>
     <div id="file-tree">Loading…</div>
   </div>
 
@@ -190,9 +213,39 @@ function renderTree(nodes, container) {
       const wrapper = document.createElement('div');
       const header = document.createElement('div');
       header.className = 'tree-item tree-dir';
-      header.innerHTML = `<span class="icon">📁</span><span>${escHtml(node.name)}</span>`;
+
+      const icon = document.createElement('span');
+      icon.className = 'icon';
+      icon.textContent = '📁';
+
+      const label = document.createElement('span');
+      label.textContent = node.name;
+
+      const actions = document.createElement('span');
+      actions.className = 'tree-actions';
+
+      const btnFile = document.createElement('button');
+      btnFile.className = 'tree-action-btn';
+      btnFile.title = 'New file here';
+      btnFile.textContent = '+f';
+
+      const btnDir = document.createElement('button');
+      btnDir.className = 'tree-action-btn';
+      btnDir.title = 'New folder here';
+      btnDir.textContent = '+d';
+
       const children = document.createElement('div');
       children.className = 'tree-children';
+
+      btnFile.onclick = (e) => { e.stopPropagation(); children.classList.remove('collapsed'); showCreateInput(children, node.path, 'file'); };
+      btnDir.onclick = (e) => { e.stopPropagation(); children.classList.remove('collapsed'); showCreateInput(children, node.path, 'dir'); };
+
+      actions.appendChild(btnFile);
+      actions.appendChild(btnDir);
+      header.appendChild(icon);
+      header.appendChild(label);
+      header.appendChild(actions);
+
       renderTree(node.children, children);
       header.onclick = () => children.classList.toggle('collapsed');
       wrapper.appendChild(header);
@@ -211,6 +264,67 @@ function renderTree(nodes, container) {
 
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showCreateInput(container, parentPath, type) {
+  container.querySelectorAll('.tree-inline-row').forEach(el => el.remove());
+
+  const row = document.createElement('div');
+  row.className = 'tree-inline-row';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = type === 'file' ? 'name.abc' : 'folder-name';
+  row.appendChild(input);
+  container.prepend(row);
+  input.focus();
+
+  input.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      const name = input.value.trim();
+      if (!name) { row.remove(); return; }
+      const fullPath = parentPath ? `${parentPath}/${name}` : name;
+      row.remove();
+      await confirmCreate(fullPath, type);
+    } else if (e.key === 'Escape') {
+      row.remove();
+    }
+  });
+}
+
+async function confirmCreate(path, type) {
+  if (type === 'file') {
+    let finalPath = path;
+    if (!finalPath.match(/\.[^/]+$/)) finalPath += '.abc';
+    const title = finalPath.replace(/^.*\//, '').replace(/\.abc$/i, '');
+    const template = `X: 1\nT: ${title}\nM: 4/4\nL: 1/8\nK: C\n|: z4 :|`;
+    const res = await fetch('/api/file/create', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({path: finalPath, content: template}),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      await loadTree();
+      const item = document.querySelector(`[data-path="${CSS.escape(finalPath)}"]`);
+      openFile(finalPath, item);
+      setStatus(`Created: ${finalPath}`);
+    } else {
+      setStatus('Create failed: ' + (data.error || 'unknown'));
+    }
+  } else {
+    const res = await fetch('/api/dir/create', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({path}),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      await loadTree();
+      setStatus(`Created folder: ${path}`);
+    } else {
+      setStatus('Create failed: ' + (data.error || 'unknown'));
+    }
+  }
 }
 
 // ---- File operations ----

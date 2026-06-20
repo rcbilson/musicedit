@@ -100,6 +100,21 @@ def create_file():
         return jsonify({"error": str(e)}), 400
 
 
+@app.route("/api/dir/create", methods=["POST"])
+def create_dir():
+    data = request.get_json()
+    if not data or "path" not in data:
+        return jsonify({"error": "missing path"}), 400
+    try:
+        target = safe_path(data["path"])
+        if target.exists():
+            return jsonify({"error": "directory already exists"}), 409
+        target.mkdir(parents=True)
+        return jsonify({"ok": True})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
