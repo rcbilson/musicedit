@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN useradd --system --no-create-home -u 1000 -g 1000 appuser
+RUN useradd --system --no-create-home -u 1000 -U appuser
 USER appuser
 
 ENV PORT=5000
