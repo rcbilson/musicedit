@@ -112,7 +112,6 @@
   <h1>ABC Music Editor</h1>
   <input id="new-filename" type="text" placeholder="new-piece.abc" />
   <button class="primary" onclick="createFile()">New File</button>
-  <button class="primary" onclick="saveFile()" id="save-btn" disabled>Save</button>
 </div>
 
 <div id="main">
@@ -158,6 +157,10 @@
 let currentFile = null;
 let isDirty = false;
 let renderTimer = null;
+let autosaveTimer = null;
+let savePromise = null;      // in-flight save, if any
+const AUTOSAVE_DELAY_MS = 1500;     // save this long after typing stops
+const AUTOSAVE_INTERVAL_MS = 10000; // and at least this often while dirty
 let synthController = null;
 let audioContext = null;
 let isPlaying = false;
@@ -330,7 +333,10 @@ async function confirmCreate(path, type) {
 // ---- File operations ----
 
 async function openFile(path, itemEl) {
-  if (isDirty && !confirm('Unsaved changes. Discard?')) return;
+  if (!(await saveFile())) {
+    setStatus('Could not save current file; not switching.');
+    return;
+  }
 
   document.querySelectorAll('.tree-item.selected').forEach(e => e.classList.remove('selected'));
   if (itemEl) itemEl.classList.add('selected');
@@ -343,7 +349,6 @@ async function openFile(path, itemEl) {
   isDirty = false;
   document.getElementById('current-file').textContent = path;
   document.getElementById('dirty-indicator').style.display = 'none';
-  document.getElementById('save-btn').disabled = false;
 
   const editor = document.getElementById('abc-editor');
   editor.value = data.content;
@@ -356,23 +361,65 @@ async function openFile(path, itemEl) {
   setStatus(`Opened: ${path}`);
 }
 
+// Saves the current file if it has unsaved changes. Returns true when there
+// is nothing left unsaved (or no file open), false if the save failed.
 async function saveFile() {
-  if (!currentFile) return;
+  clearTimeout(autosaveTimer);
+  // Wait for any in-flight save so saves never overlap or reorder.
+  while (savePromise) await savePromise;
+  if (!currentFile || !isDirty) return true;
+
+  const path = currentFile;
   const content = document.getElementById('abc-editor').value;
-  const res = await fetch('/api/file', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({path: currentFile, content}),
-  });
-  const data = await res.json();
-  if (data.ok) {
-    isDirty = false;
-    document.getElementById('dirty-indicator').style.display = 'none';
-    setStatus(`Saved: ${currentFile}`);
-  } else {
-    setStatus('Save failed: ' + (data.error || 'unknown'));
+  savePromise = (async () => {
+    try {
+      const res = await fetch('/api/file', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path, content}),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'unknown');
+      // Only clear dirty if nothing changed while the request was in flight.
+      if (currentFile === path && document.getElementById('abc-editor').value === content) {
+        isDirty = false;
+        document.getElementById('dirty-indicator').style.display = 'none';
+      }
+      setStatus(`Saved: ${path}`);
+      return true;
+    } catch (e) {
+      setStatus('Save failed: ' + e.message);
+      return false;
+    }
+  })();
+  try {
+    return await savePromise;
+  } finally {
+    savePromise = null;
   }
 }
+
+function scheduleAutosave() {
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(saveFile, AUTOSAVE_DELAY_MS);
+}
+
+setInterval(() => { if (isDirty) saveFile(); }, AUTOSAVE_INTERVAL_MS);
+
+// Best-effort save when the page is hidden or closed.
+function flushOnExit() {
+  if (!currentFile || !isDirty) return;
+  fetch('/api/file', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({path: currentFile, content: document.getElementById('abc-editor').value}),
+    keepalive: true,
+  });
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushOnExit();
+});
+window.addEventListener('pagehide', flushOnExit);
 
 async function createFile() {
   const input = document.getElementById('new-filename');
@@ -508,6 +555,7 @@ document.getElementById('abc-editor').addEventListener('input', () => {
     isDirty = true;
     document.getElementById('dirty-indicator').style.display = 'inline';
   }
+  scheduleAutosave();
   clearTimeout(renderTimer);
   renderTimer = setTimeout(renderABC, 400);
 });
